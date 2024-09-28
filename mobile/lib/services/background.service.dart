@@ -13,12 +13,17 @@ import 'package:immich_mobile/main.dart';
 import 'package:immich_mobile/models/backup/backup_candidate.model.dart';
 import 'package:immich_mobile/models/backup/success_upload_asset.model.dart';
 import 'package:immich_mobile/repositories/album.repository.dart';
+import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset.repository.dart';
+import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/backup.repository.dart';
 import 'package:immich_mobile/repositories/album_media.repository.dart';
 import 'package:immich_mobile/repositories/file_media.repository.dart';
+import 'package:immich_mobile/repositories/partner_api.repository.dart';
 import 'package:immich_mobile/repositories/user.repository.dart';
+import 'package:immich_mobile/repositories/user_api.repository.dart';
 import 'package:immich_mobile/services/album.service.dart';
+import 'package:immich_mobile/services/entity.service.dart';
 import 'package:immich_mobile/services/hash.service.dart';
 import 'package:immich_mobile/services/localization.service.dart';
 import 'package:immich_mobile/entities/backup_album.entity.dart';
@@ -28,7 +33,6 @@ import 'package:immich_mobile/services/backup.service.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/services/api.service.dart';
-import 'package:immich_mobile/services/partner.service.dart';
 import 'package:immich_mobile/services/sync.service.dart';
 import 'package:immich_mobile/services/user.service.dart';
 import 'package:immich_mobile/utils/backup_progress.dart';
@@ -360,26 +364,45 @@ class BackgroundService {
     apiService.setAccessToken(Store.get(StoreKey.accessToken));
     AppSettingsService settingService = AppSettingsService();
     AppSettingsService settingsService = AppSettingsService();
-    PartnerService partnerService = PartnerService(apiService, db);
     AlbumRepository albumRepository = AlbumRepository(db);
     AssetRepository assetRepository = AssetRepository(db);
-    UserRepository userRepository = UserRepository(db);
     BackupRepository backupAlbumRepository = BackupRepository(db);
     AlbumMediaRepository albumMediaRepository = AlbumMediaRepository();
     FileMediaRepository fileMediaRepository = FileMediaRepository();
-    HashService hashService = HashService(db, this, albumMediaRepository);
-    SyncService syncSerive = SyncService(db, hashService, albumMediaRepository);
-    UserService userService =
-        UserService(apiService, db, syncSerive, partnerService);
+    AssetMediaRepository assetMediaRepository = AssetMediaRepository();
+    UserRepository userRepository = UserRepository(db);
+    UserApiRepository userApiRepository =
+        UserApiRepository(apiService.usersApi);
+    AlbumApiRepository albumApiRepository =
+        AlbumApiRepository(apiService.albumsApi);
+    PartnerApiRepository partnerApiRepository =
+        PartnerApiRepository(apiService.partnersApi);
+    HashService hashService =
+        HashService(assetRepository, this, albumMediaRepository);
+    EntityService entityService =
+        EntityService(assetRepository, userRepository);
+    SyncService syncSerive = SyncService(
+      db,
+      hashService,
+      entityService,
+      albumMediaRepository,
+      albumApiRepository,
+    );
+    UserService userService = UserService(
+      partnerApiRepository,
+      userApiRepository,
+      userRepository,
+      syncSerive,
+    );
     AlbumService albumService = AlbumService(
-      apiService,
       userService,
       syncSerive,
+      entityService,
       albumRepository,
       assetRepository,
-      userRepository,
       backupAlbumRepository,
       albumMediaRepository,
+      albumApiRepository,
     );
     BackupService backupService = BackupService(
       apiService,
@@ -388,6 +411,7 @@ class BackgroundService {
       albumService,
       albumMediaRepository,
       fileMediaRepository,
+      assetMediaRepository,
     );
 
     final selectedAlbums = backupService.selectedAlbumsQuery().findAllSync();

@@ -8,7 +8,7 @@ import { ExifEntity } from 'src/entities/exif.entity';
 import { GeodataPlacesEntity } from 'src/entities/geodata-places.entity';
 import { SmartInfoEntity } from 'src/entities/smart-info.entity';
 import { SmartSearchEntity } from 'src/entities/smart-search.entity';
-import { AssetType } from 'src/enum';
+import { AssetType, PaginationMode } from 'src/enum';
 import { DatabaseExtension } from 'src/interfaces/database.interface';
 import { ILoggerRepository } from 'src/interfaces/logger.interface';
 import {
@@ -23,7 +23,7 @@ import {
 } from 'src/interfaces/search.interface';
 import { asVector, searchAssetBuilder } from 'src/utils/database';
 import { Instrumentation } from 'src/utils/instrumentation';
-import { Paginated, PaginationMode, PaginationResult, paginatedBuilder } from 'src/utils/pagination';
+import { Paginated, PaginationResult, paginatedBuilder } from 'src/utils/pagination';
 import { isValidInteger } from 'src/validation';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 
@@ -73,8 +73,13 @@ export class SearchRepository implements ISearchRepository {
   async searchMetadata(pagination: SearchPaginationOptions, options: AssetSearchOptions): Paginated<AssetEntity> {
     let builder = this.assetRepository.createQueryBuilder('asset');
     builder = searchAssetBuilder(builder, options);
-
     builder.orderBy('asset.fileCreatedAt', options.orderDirection ?? 'DESC');
+
+    if (options.random) {
+      // TODO replace with complicated SQL magic after kysely migration
+      builder.addSelect('RANDOM() as r').orderBy('r');
+    }
+
     return paginatedBuilder<AssetEntity>(builder, {
       mode: PaginationMode.SKIP_TAKE,
       skip: (pagination.page - 1) * pagination.size,
